@@ -1,11 +1,11 @@
 import { Quaternion, Vector3 } from 'three';
 import type { VRM, VRMHumanBoneName } from '@pixiv/three-vrm';
-import type { LoopAnimationId, TrackingFrame, TrackingMode } from '@halloweenpuppet/shared';
-import type { LipSyncFrame } from '../audio/LipSyncProvider';
+import type { ExaggerationPresetId, LoopAnimationId, TrackingFrame, TrackingMode } from '@halloweenpuppet/shared';
 import { FaceMapper } from './FaceMapper';
 import type { HalloweenFace } from './HalloweenFace';
 import type { HumanoidSkeleton } from './HumanoidSkeleton';
 import type { LoopSample } from './LoopAnimationPlayer';
+import { MotionExaggeration } from './MotionExaggeration';
 import type { MotionSmoothing } from './MotionSmoothing';
 import type { SkeletonMapper } from './SkeletonMapper';
 import { BONE_NAMES, type BoneName, type MappedPose } from './types';
@@ -34,6 +34,7 @@ const VRM_BONES: Record<BoneName, VRMHumanBoneName> = {
 
 export class AvatarController {
   private readonly faceMapper = new FaceMapper();
+  private readonly exaggeration = new MotionExaggeration();
   private lastMode: TrackingMode | null = null;
   private lastLoopId: LoopAnimationId | null = null;
 
@@ -49,41 +50,42 @@ export class AvatarController {
     this.vrm = vrm;
   }
 
-  applyLoop(id: LoopAnimationId, sample: LoopSample, lipSync?: LipSyncFrame | null): MappedPose {
+  setExaggerationPreset(id: ExaggerationPresetId): void {
+    this.exaggeration.setPreset(id);
+  }
+
+  applyLoop(id: LoopAnimationId, sample: LoopSample): MappedPose {
     if (this.lastLoopId !== id || this.lastMode !== sample.mode) {
       this.smoothing.reset();
       this.resetToRest();
       this.lastLoopId = id;
       this.lastMode = sample.mode;
     }
-    const smoothed = this.smoothing.apply(sample.pose);
+    const pose = this.exaggeration.applyToPose(sample.pose);
+    const drive = this.exaggeration.applyToDrive(sample.drive);
+    const smoothed = this.smoothing.apply(pose);
     this.skeleton.apply(smoothed);
     this.applyBonesToVrm(smoothed);
     this.halloweenFace.apply({
-      ...sample.drive,
-      head: this.smoothing.smoothQuaternion('halloween-head', sample.drive.head),
-      jawOpen: this.smoothing.smoothScalar('hallo-jaw', sample.drive.jawOpen),
-      blinkLeft: this.smoothing.smoothScalar('hallo-blink-l', sample.drive.blinkLeft),
-      blinkRight: this.smoothing.smoothScalar('hallo-blink-r', sample.drive.blinkRight),
-      smile: this.smoothing.smoothScalar('hallo-smile', sample.drive.smile),
-      browUp: this.smoothing.smoothScalar('hallo-brow', sample.drive.browUp),
-      lookX: this.smoothing.smoothScalar('hallo-look-x', sample.drive.lookX),
-      lookY: this.smoothing.smoothScalar('hallo-look-y', sample.drive.lookY),
+      ...drive,
+      head: this.smoothing.smoothQuaternion('halloween-head', drive.head),
+      jawOpen: this.smoothing.smoothScalar('hallo-jaw', drive.jawOpen),
+      blinkLeft: this.smoothing.smoothScalar('hallo-blink-l', drive.blinkLeft),
+      blinkRight: this.smoothing.smoothScalar('hallo-blink-r', drive.blinkRight),
+      smile: this.smoothing.smoothScalar('hallo-smile', drive.smile),
+      browUp: this.smoothing.smoothScalar('hallo-brow', drive.browUp),
+      lookX: this.smoothing.smoothScalar('hallo-look-x', drive.lookX),
+      lookY: this.smoothing.smoothScalar('hallo-look-y', drive.lookY),
     });
-    if (lipSync && sample.mode !== 'face') {
-      this.applyAudioMouth(lipSync);
-    } else if (sample.drive.visemes) {
-      this.halloweenFace.applyMouth(sample.drive.jawOpen, sample.drive.visemes);
+    if (drive.visemes) {
+      this.halloweenFace.applyMouth(drive.jawOpen, drive.visemes);
     }
     return smoothed;
   }
 
-  apply(frame: TrackingFrame | null, lipSync?: LipSyncFrame | null): MappedPose | null {
+  apply(frame: TrackingFrame | null): MappedPose | null {
     this.lastLoopId = null;
     if (!frame) {
-      if (lipSync) {
-        this.applyAudioMouth(lipSync);
-      }
       return null;
     }
     const mode = frame.mode ?? (frame.face && !frame.pose ? 'face' : 'body');
@@ -93,11 +95,7 @@ export class AvatarController {
       this.lastMode = mode;
     }
 
-    const mapped = mode === 'face' ? this.applyFace(frame) : this.applyBody(frame);
-    if (lipSync) {
-      this.applyAudioMouth(lipSync);
-    }
-    return mapped;
+    return mode === 'face' ? this.applyFace(frame) : this.applyBody(frame);
   }
 
   private applyBody(frame: TrackingFrame): MappedPose | null {
@@ -105,7 +103,7 @@ export class AvatarController {
     if (!mapped) {
       return null;
     }
-    const smoothed = this.smoothing.apply(mapped);
+    const smoothed = this.smoothing.apply(this.exaggeration.applyToPose(mapped));
     this.skeleton.apply(smoothed);
     this.applyBonesToVrm(smoothed);
     return smoothed;
@@ -116,20 +114,21 @@ export class AvatarController {
     if (!mapped) {
       return null;
     }
-    const smoothed = this.smoothing.apply(mapped.pose);
+    const drive = this.exaggeration.applyToDrive(mapped.drive);
+    const smoothed = this.smoothing.apply(this.exaggeration.applyToPose(mapped.pose));
     this.skeleton.apply(smoothed);
     this.applyBonesToVrm(smoothed);
-    this.applyExpressions(mapped.expressions);
+    this.applyExpressions(this.exaggeration.applyToExpressions(mapped.expressions));
     this.halloweenFace.apply({
-      head: this.smoothing.smoothQuaternion('halloween-head', mapped.drive.head),
-      jawOpen: this.smoothing.smoothScalar('hallo-jaw', mapped.drive.jawOpen),
-      blinkLeft: this.smoothing.smoothScalar('hallo-blink-l', mapped.drive.blinkLeft),
-      blinkRight: this.smoothing.smoothScalar('hallo-blink-r', mapped.drive.blinkRight),
-      smile: this.smoothing.smoothScalar('hallo-smile', mapped.drive.smile),
-      browUp: this.smoothing.smoothScalar('hallo-brow', mapped.drive.browUp),
-      lookX: this.smoothing.smoothScalar('hallo-look-x', mapped.drive.lookX),
-      lookY: this.smoothing.smoothScalar('hallo-look-y', mapped.drive.lookY),
-      glassesWear: this.smoothing.smoothScalar('hallo-glasses', mapped.drive.glassesWear),
+      head: this.smoothing.smoothQuaternion('halloween-head', drive.head),
+      jawOpen: this.smoothing.smoothScalar('hallo-jaw', drive.jawOpen),
+      blinkLeft: this.smoothing.smoothScalar('hallo-blink-l', drive.blinkLeft),
+      blinkRight: this.smoothing.smoothScalar('hallo-blink-r', drive.blinkRight),
+      smile: this.smoothing.smoothScalar('hallo-smile', drive.smile),
+      browUp: this.smoothing.smoothScalar('hallo-brow', drive.browUp),
+      lookX: this.smoothing.smoothScalar('hallo-look-x', drive.lookX),
+      lookY: this.smoothing.smoothScalar('hallo-look-y', drive.lookY),
+      glassesWear: this.smoothing.smoothScalar('hallo-glasses', drive.glassesWear),
     });
     return smoothed;
   }
@@ -156,28 +155,6 @@ export class AvatarController {
     }
   }
 
-  private applyAudioMouth(lipSync: LipSyncFrame): void {
-    const visemes = lipSync.visemes ?? {};
-    this.halloweenFace.applyMouth(lipSync.mouthOpen, visemes);
-    const manager = this.vrm?.expressionManager;
-    if (!manager) {
-      return;
-    }
-    const weights: Record<string, number> = {
-      aa: visemes.aa ?? (lipSync.viseme === 'aa' ? lipSync.mouthOpen : 0),
-      ee: visemes.ee ?? (lipSync.viseme === 'ee' ? lipSync.mouthOpen : 0),
-      ih: visemes.ih ?? (lipSync.viseme === 'ih' ? lipSync.mouthOpen : 0),
-      oh: visemes.oh ?? (lipSync.viseme === 'oh' ? lipSync.mouthOpen : 0),
-      ou: visemes.ou ?? (lipSync.viseme === 'ou' ? lipSync.mouthOpen : 0),
-    };
-    for (const [name, value] of Object.entries(weights)) {
-      if (!manager.getExpression(name)) {
-        continue;
-      }
-      manager.setValue(name, this.smoothing.smoothScalar(`audio-${name}`, value));
-    }
-  }
-
   private applyExpressions(expressions: Record<string, number>): void {
     const manager = this.vrm?.expressionManager;
     if (!manager) {
@@ -189,6 +166,13 @@ export class AvatarController {
       }
       manager.setValue(name, this.smoothing.smoothScalar(name, value));
     }
+  }
+
+  reset(): void {
+    this.lastLoopId = null;
+    this.lastMode = null;
+    this.smoothing.reset();
+    this.resetToRest();
   }
 
   private resetToRest(): void {

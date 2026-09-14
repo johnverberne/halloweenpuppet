@@ -4,9 +4,24 @@ export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'err
 
 export type TrackingMode = 'body' | 'face';
 
+export type DanceCast = 'solo' | 'duo';
+
 export type HalloweenFigureId = 'pumpkin' | 'skeleton' | 'zombie' | 'frankenstein';
 
 export type LoopAnimationId = 'idle' | 'talk' | 'laugh' | 'nod' | 'wave';
+
+export type ExaggerationPresetId = 'normal' | 'cartoon' | 'halloween' | 'extreme';
+
+export const EXAGGERATION_PRESETS: ReadonlyArray<{
+  id: ExaggerationPresetId;
+  label: string;
+  blurb: string;
+}> = [
+  { id: 'normal', label: 'Normaal', blurb: '1:1 beweging, geen extra punch' },
+  { id: 'cartoon', label: 'Cartoon', blurb: 'Iets groter dan het leven' },
+  { id: 'halloween', label: 'Halloween', blurb: 'Grijns, kaak en armen extra' },
+  { id: 'extreme', label: 'Extreem', blurb: 'Maximale overdrijving, geklemd' },
+];
 
 export const LOOP_ANIMATIONS: ReadonlyArray<{
   id: LoopAnimationId;
@@ -30,12 +45,18 @@ export const HALLOWEEN_FIGURES: ReadonlyArray<{ id: HalloweenFigureId; label: st
 
 export interface SessionSettings {
   halloweenFigure: HalloweenFigureId;
+  halloweenFigureB: HalloweenFigureId;
   loopAnimation: LoopAnimationId | null;
+  danceCast: DanceCast;
+  exaggerationPreset: ExaggerationPresetId;
 }
 
 export const DEFAULT_SESSION_SETTINGS: SessionSettings = {
   halloweenFigure: 'pumpkin',
+  halloweenFigureB: 'skeleton',
   loopAnimation: null,
+  danceCast: 'solo',
+  exaggerationPreset: 'halloween',
 };
 
 export interface Landmark {

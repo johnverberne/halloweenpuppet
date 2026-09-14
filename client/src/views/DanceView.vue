@@ -1,17 +1,18 @@
 <template>
-  <main class="music">
+  <main class="dance">
     <div class="phone">
       <div class="viewport">
         <canvas ref="sceneRef" class="scene"></canvas>
         <canvas ref="overlayRef" class="overlay"></canvas>
         <CountdownOverlay :label="countdownLabel" />
         <p v-if="isPlaying" class="now-playing">{{ trackTitle }}</p>
+        <p class="cast-banner">{{ settings.danceCast === 'duo' ? 'Duo' : 'Solo' }} · {{ personCount }} persoon{{ personCount === 1 ? '' : 'en' }}</p>
       </div>
     </div>
 
     <aside class="sidebar">
       <DebugOverlay
-        title="Music"
+        title="Dance"
         :session-id="sessionId"
         :connection-state="connectionState"
         :tracking-mode="incomingMode"
@@ -26,7 +27,19 @@
         :glasses-confidence="glassesConfidence"
         :exaggeration-label="exaggerationName"
       />
-      <ExaggerationPicker v-model="settings.exaggerationPreset" />
+
+      <section class="panel">
+        <p class="kicker">Cast</p>
+        <label class="field">
+          Personen
+          <select v-model="settings.danceCast">
+            <option value="solo">Solo — 1 avatar</option>
+            <option value="duo">Duo — 2 avatars</option>
+          </select>
+        </label>
+        <p class="muted">{{ avatarStatus }}</p>
+      </section>
+
       <MusicControls
         :player="player"
         :counting="counting"
@@ -40,12 +53,14 @@
         @stop="stopRecording"
         @download="downloadRecording"
       />
-      <FaceFigurePicker v-model="settings.halloweenFigure" />
+      <FaceFigurePicker v-model="settings.halloweenFigure" title="Figuur A" />
+      <FaceFigurePicker v-if="settings.danceCast === 'duo'" v-model="settings.halloweenFigureB" title="Figuur B" />
+      <ExaggerationPicker v-model="settings.exaggerationPreset" />
       <section class="panel">
         <p class="kicker">Sessie</p>
         <RouterLink :to="`/halloween/${sessionId}`">Open halloween</RouterLink>
-        <RouterLink :to="`/dance/${sessionId}`">Open dance-modus</RouterLink>
         <RouterLink :to="`/stage/${sessionId}`">Open brede stage</RouterLink>
+        <RouterLink :to="`/music/${sessionId}`">Open muziek</RouterLink>
         <RouterLink :to="`/sensor/${sessionId}`">Open sensor</RouterLink>
       </section>
     </aside>
@@ -81,9 +96,10 @@ const {
   glassesPresent,
   glassesConfidence,
   incomingMode,
+  avatarStatus,
   frameAgeMs,
   getCanvas,
-} = useLiveStage('music');
+} = useLiveStage('dance');
 const exaggerationName = computed(() => exaggerationLabel(settings.exaggerationPreset));
 const {
   player,
@@ -102,12 +118,12 @@ const {
 </script>
 
 <style scoped>
-.music {
+.dance {
   min-height: 100dvh;
   display: grid;
   grid-template-columns: 1fr 22rem;
   background:
-    radial-gradient(circle at 20% 0%, #2d2238, transparent 40%),
+    radial-gradient(circle at 80% 0%, #2d2238, transparent 40%),
     #100d12;
 }
 
@@ -140,16 +156,24 @@ const {
   pointer-events: none;
 }
 
-.now-playing {
+.now-playing,
+.cast-banner {
   position: absolute;
   left: 0.8rem;
   right: 0.8rem;
-  bottom: 0.8rem;
   margin: 0;
   padding: 0.45rem 0.65rem;
   border-radius: 10px;
   background: rgba(10, 8, 12, 0.65);
   font-size: 0.82rem;
+}
+
+.now-playing {
+  bottom: 0.8rem;
+}
+
+.cast-banner {
+  top: 0.8rem;
 }
 
 .sidebar {
@@ -159,8 +183,12 @@ const {
   padding: 0.8rem;
 }
 
+.field {
+  margin-top: 0.4rem;
+}
+
 @media (max-width: 900px) {
-  .music {
+  .dance {
     grid-template-columns: 1fr;
   }
 

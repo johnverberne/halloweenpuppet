@@ -7,15 +7,19 @@ const MODEL_URL =
 
 export class PoseTracker {
   private landmarker: PoseLandmarker | null = null;
+  private numPoses = 1;
 
-  async init(): Promise<void> {
-    if (this.landmarker) {
+  async init(numPoses = 1): Promise<void> {
+    const next = numPoses > 1 ? 2 : 1;
+    if (this.landmarker && this.numPoses === next) {
       return;
     }
+    this.close();
+    this.numPoses = next;
     const fileset = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM_URL);
     const options = {
       runningMode: 'VIDEO' as const,
-      numPoses: 1,
+      numPoses: this.numPoses,
       minPoseDetectionConfidence: 0.4,
       minPosePresenceConfidence: 0.4,
       minTrackingConfidence: 0.4,
@@ -34,20 +38,27 @@ export class PoseTracker {
   }
 
   detect(video: HTMLVideoElement, timestampMs: number): PosePayload | null {
+    return this.detectAll(video, timestampMs)[0] ?? null;
+  }
+
+  detectAll(video: HTMLVideoElement, timestampMs: number): PosePayload[] {
     if (!this.landmarker || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
-      return null;
+      return [];
     }
     const result: PoseLandmarkerResult = this.landmarker.detectForVideo(video, timestampMs);
-    const pose = result.landmarks[0];
-    if (!pose || pose.length === 0) {
-      return null;
-    }
-    const world = result.worldLandmarks[0] ?? [];
-    return {
-      landmarks: toLandmarks(pose),
-      worldLandmarks: toLandmarks(world),
-      confidence: averageVisibility(pose),
-    };
+    return result.landmarks
+      .map((pose, index) => {
+        if (!pose || pose.length === 0) {
+          return null;
+        }
+        const world = result.worldLandmarks[index] ?? [];
+        return {
+          landmarks: toLandmarks(pose),
+          worldLandmarks: toLandmarks(world),
+          confidence: averageVisibility(pose),
+        } satisfies PosePayload;
+      })
+      .filter((item): item is PosePayload => item !== null);
   }
 
   close(): void {

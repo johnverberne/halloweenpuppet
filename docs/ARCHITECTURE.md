@@ -3,11 +3,11 @@
 Halloween Puppet is an npm workspaces monorepo. Live motion never leaves the local network as video: the sensor runs MediaPipe in the browser and only sends landmarks.
 
 ```
-┌─────────────┐  landmarks + settings   ┌──────────────┐  broadcast   ┌─────────────┐
-│ Sensor tab  │ ─────────────────────► │ Express +    │ ───────────► │ Stage /     │
-│ MediaPipe   │                        │ Socket.IO    │              │ Music tab   │
-│ webcam      │ ◄──── session state ── │ :3000        │              │ Three.js    │
-└─────────────┘                        └──────────────┘              └─────────────┘
+┌─────────────┐  same origin            ┌──────────────────────────┐
+│ Browser     │  /  /api  /socket.io    │ One HTTPS process :3000  │
+│ Sensor/     │ ─────────────────────► │ Express + Socket.IO      │
+│ Stage/…     │ ◄──── session state ── │ Vue: Vite or client/dist │
+└─────────────┘                         └──────────────────────────┘
 ```
 
 ## Packages
@@ -15,10 +15,12 @@ Halloween Puppet is an npm workspaces monorepo. Live motion never leaves the loc
 | Package | Path | Role |
 | --- | --- | --- |
 | `@halloweenpuppet/shared` | `shared/` | Session IDs, tracking protocol, figure and animation enums |
-| `@halloweenpuppet/server` | `server/` | Session registry, Socket.IO relay, health/connect APIs |
+| `@halloweenpuppet/server` | `server/` | HTTPS host: session registry, Socket.IO, Vue app |
 | `@halloweenpuppet/client` | `client/` | Vue 3 UI, MediaPipe, Three.js / VRM, music and recording |
 
-During `npm run dev`, Vite (`https://localhost:5173`) proxies `/api` and `/socket.io` to the server. After `npm run build`, Express serves `client/dist` from port 3000.
+`npm run dev` starts **one** process on `https://localhost:3000`. Express handles `/api` and Socket.IO; Vite runs as middleware for the Vue app (HMR included). `npm start` after a build serves `client/dist` from that same process. The browser never needs a second origin: `io()` and `fetch('/api/…')` use the page host.
+
+`npm run dev:split` is the old two-process setup (API-only server + Vite on 5173).
 
 ## Routes
 
@@ -28,6 +30,8 @@ During `npm run dev`, Vite (`https://localhost:5173`) proxies `/api` and `/socke
 | `/sensor/:sessionId` | Camera + MediaPipe (body or face) |
 | `/stage/:sessionId` | Wide 3D stage, VRM, Halloween figures, music controls |
 | `/music/:sessionId` | 9:16 “phone” viewport for recording |
+| `/dance/:sessionId` | 9:16 dance stage, solo or duo avatars |
+| `/halloween/:sessionId` | Themed stage: moon, mist, pumpkins, exaggeration presets |
 
 ## Tracking protocol
 
@@ -41,7 +45,11 @@ A `TrackingFrame` (see `shared/src/protocol.ts`) can carry:
 
 The server does not interpret landmarks. It stamps `clientId` and emits the frame to the other sockets in the same session.
 
-Session-wide settings (`halloweenFigure`, `loopAnimation`) go over `session-settings` so every stage stays in sync.
+Session-wide settings (`halloweenFigure`, `halloweenFigureB`, `loopAnimation`, `danceCast`, `exaggerationPreset`) go over `session-settings` so every stage stays in sync.
+
+`MotionExaggeration` scales mapped arm/head rotations and face drive (mouth, eyes, brows) after mapping and before smoothing. Outputs are clamped.
+
+Duo tracking assigns a stable `personId` (1 or 2) with nearest-neighbour matching on torso/face center so avatars do not swap when people cross.
 
 ## Client pipeline
 
@@ -49,7 +57,7 @@ Session-wide settings (`halloweenFigure`, `loopAnimation`) go over `session-sett
 2. **Stage / Music** — `useLiveStage` receives frames and drives `StageScene`.
 3. **Body** — `SkeletonMapper` → `MotionSmoothing` → `HumanoidSkeleton` and VRM humanoid bones.
 4. **Face** — `FaceMapper` → Halloween figure (`HalloweenFace`) plus VRM expressions when present.
-5. **Lipsync** — `FaceTrackingLipSyncProvider` and/or `AudioVisemeLipSyncProvider` (FFT/RMS → aa / ee / ih / oh / ou).
+5. **Mouth** — face blendshapes (and loop animations) drive the Halloween jaw. Music is not analysed for visemes.
 6. **Record** — `StageRecorder` captures the WebGL canvas (9:16 on the music page) plus the music graph into WebM.
 
 ## Audio graph
@@ -57,11 +65,11 @@ Session-wide settings (`halloweenFigure`, `loopAnimation`) go over `session-sett
 `MusicPlayer` builds the Web Audio graph on the first user gesture (Play or 3-2-1 GO):
 
 ```
-<audio> → MediaElementSource → Analyser → Gain → speakers
-                                         ↘ MediaStreamDestination (recording)
+<audio> → MediaElementSource → Gain → speakers
+                                ↘ MediaStreamDestination (recording)
 ```
 
-The analyser must stay in series. Creating the `AudioContext` only after a countdown would often get blocked by the browser autoplay policy.
+Creating the `AudioContext` only after a countdown would often get blocked by the browser autoplay policy.
 
 ## Privacy
 

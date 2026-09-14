@@ -1,14 +1,18 @@
 <template>
-  <main class="stage">
+  <main class="halloween" :class="{ narrow }">
     <div class="viewport">
       <canvas ref="sceneRef" class="scene"></canvas>
       <canvas ref="overlayRef" class="overlay"></canvas>
       <CountdownOverlay :label="countdownLabel" />
+      <p class="banner">Halloween · {{ figureLabel }} · {{ exaggerationName }}</p>
+      <button v-if="narrow" type="button" class="fab" @click="drawerOpen = !drawerOpen">
+        {{ drawerOpen ? 'Sluit bediening' : 'Bediening' }}
+      </button>
     </div>
 
-    <aside class="sidebar">
+    <aside v-show="!narrow || drawerOpen" class="sidebar">
       <DebugOverlay
-        title="Stage"
+        title="Halloween"
         :session-id="sessionId"
         :connection-state="connectionState"
         :tracking-mode="incomingMode"
@@ -24,32 +28,23 @@
         :sensor-count="sensorCount"
         :stage-count="stageCount"
         :exaggeration-label="exaggerationName"
+        start-open
       />
-
+      <FaceFigurePicker v-model="settings.halloweenFigure" />
+      <ExaggerationPicker v-model="settings.exaggerationPreset" />
       <section class="panel">
         <p class="kicker">Weergave</p>
         <label class="check">
           <input v-model="settings.showDebugSkeleton" type="checkbox" />
           2D debug skeleton
         </label>
-        <label class="check">
-          <input v-model="settings.showHumanoid" type="checkbox" />
-          3D humanoid
-        </label>
-        <label class="check">
-          <input v-model="settings.showVrm" type="checkbox" />
-          VRM avatar
-        </label>
         <label class="field">
           Smoothing
           <input v-model.number="settings.smoothing" type="range" min="0.1" max="0.8" step="0.05" />
-          <span>{{ settings.smoothing.toFixed(2) }} new / {{ (1 - settings.smoothing).toFixed(2) }} previous</span>
+          <span>{{ settings.smoothing.toFixed(2) }} new</span>
         </label>
         <p class="muted">{{ avatarStatus }}</p>
       </section>
-
-      <FaceFigurePicker v-model="settings.halloweenFigure" />
-      <ExaggerationPicker v-model="settings.exaggerationPreset" />
       <MusicControls
         :player="player"
         :counting="counting"
@@ -63,14 +58,13 @@
         @stop="stopRecording"
         @download="downloadRecording"
       />
-
+      <PhoneConnect :path="`/sensor/${sessionId}`" />
       <section class="panel">
         <p class="kicker">Sessie</p>
         <p class="muted">Sensors {{ sensorCount }} · Stages {{ stageCount }}</p>
-        <RouterLink :to="`/halloween/${sessionId}`">Open halloween</RouterLink>
-        <RouterLink :to="`/music/${sessionId}`">Open muziekmodus</RouterLink>
-        <RouterLink :to="`/dance/${sessionId}`">Open dance-modus</RouterLink>
-        <RouterLink :to="`/sensor/${sessionId}`">Open sensor van deze sessie</RouterLink>
+        <RouterLink :to="`/sensor/${sessionId}`">Open sensor</RouterLink>
+        <RouterLink :to="`/stage/${sessionId}`">Open stage</RouterLink>
+        <RouterLink :to="`/dance/${sessionId}`">Open dance</RouterLink>
       </section>
     </aside>
   </main>
@@ -78,21 +72,25 @@
 
 <script setup lang="ts">
 import { storeToRefs } from 'pinia';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
+import { EXAGGERATION_PRESETS, HALLOWEEN_FIGURES } from '@halloweenpuppet/shared';
 import CountdownOverlay from '../components/CountdownOverlay.vue';
 import DebugOverlay from '../components/DebugOverlay.vue';
 import ExaggerationPicker from '../components/ExaggerationPicker.vue';
 import FaceFigurePicker from '../components/FaceFigurePicker.vue';
-import { exaggerationLabel } from '../animation/MotionExaggeration';
 import MusicControls from '../components/MusicControls.vue';
+import PhoneConnect from '../components/PhoneConnect.vue';
 import RecordControls from '../components/RecordControls.vue';
 import { useLiveStage } from '../composables/useLiveStage';
+import { useNarrowViewport } from '../composables/useNarrowViewport';
 import { useStageCapture } from '../composables/useStageCapture';
 import { useSessionStore } from '../stores/session';
 import { useSettingsStore } from '../stores/settings';
 
 const sessionStore = useSessionStore();
 const settings = useSettingsStore();
+const narrow = useNarrowViewport();
+const drawerOpen = ref(false);
 const { sessionId, connectionState, latencyMs, sensorCount, stageCount } = storeToRefs(sessionStore);
 const {
   sceneRef,
@@ -108,8 +106,7 @@ const {
   avatarStatus,
   frameAgeMs,
   getCanvas,
-} = useLiveStage('stage');
-const exaggerationName = computed(() => exaggerationLabel(settings.exaggerationPreset));
+} = useLiveStage('halloween');
 const {
   player,
   countdownLabel,
@@ -122,19 +119,31 @@ const {
   stopRecording,
   downloadRecording,
 } = useStageCapture(getCanvas);
+
+const figureLabel = computed(
+  () => HALLOWEEN_FIGURES.find((figure) => figure.id === settings.halloweenFigure)?.label ?? settings.halloweenFigure,
+);
+const exaggerationName = computed(
+  () =>
+    EXAGGERATION_PRESETS.find((preset) => preset.id === settings.exaggerationPreset)?.label ??
+    settings.exaggerationPreset,
+);
 </script>
 
 <style scoped>
-.stage {
+.halloween {
   min-height: 100dvh;
   display: grid;
   grid-template-columns: 1fr 22rem;
+  background: #09070d;
 }
 
 .viewport {
   position: relative;
   min-height: 100dvh;
-  background: #141018;
+  background:
+    radial-gradient(circle at 18% 12%, #3a2410, transparent 28%),
+    #09070d;
 }
 
 .scene,
@@ -149,11 +158,32 @@ const {
   pointer-events: none;
 }
 
+.banner {
+  position: absolute;
+  top: calc(0.8rem + env(safe-area-inset-top));
+  left: 0.8rem;
+  margin: 0;
+  padding: 0.4rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(248, 255, 107, 0.9);
+  color: #102016;
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+
+.fab {
+  position: absolute;
+  right: calc(0.8rem + env(safe-area-inset-right));
+  bottom: calc(0.8rem + env(safe-area-inset-bottom));
+  min-height: 2.8rem;
+}
+
 .sidebar {
   display: grid;
   align-content: start;
   gap: 0.8rem;
   padding: 0.8rem;
+  padding-bottom: calc(0.8rem + env(safe-area-inset-bottom));
 }
 
 .check {
@@ -165,16 +195,21 @@ const {
 }
 
 @media (max-width: 900px) {
-  .stage {
+  .halloween {
     grid-template-columns: 1fr;
   }
 
   .viewport {
-    min-height: 55dvh;
+    min-height: 58dvh;
   }
 
   .sidebar {
-    padding-bottom: calc(0.8rem + env(safe-area-inset-bottom));
+    position: sticky;
+    bottom: 0;
+    max-height: 42dvh;
+    overflow: auto;
+    background: #100d12;
+    border-top: 1px solid var(--line);
   }
 }
 </style>

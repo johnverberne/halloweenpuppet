@@ -9,7 +9,7 @@ npm install
 npm run dev
 ```
 
-Open `https://localhost:5173`, accept the self-signed certificate, then use one session on both **sensor** and **stage**.
+Open `https://localhost:3000`, accept the self-signed certificate, then use one session on both **sensor** and **stage**.
 
 ## Checks before a pull request
 

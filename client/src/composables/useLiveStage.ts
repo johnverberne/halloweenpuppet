@@ -2,18 +2,16 @@ import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import type { SessionSettings, TrackingFrame, TrackingMode } from '@halloweenpuppet/shared';
 import { LoopAnimationPlayer } from '../animation/LoopAnimationPlayer';
-import { StageScene } from '../animation/StageScene';
-import { AudioVisemeLipSyncProvider } from '../audio/AudioVisemeLipSyncProvider';
-import { FaceTrackingLipSyncProvider } from '../audio/FaceTrackingLipSyncProvider';
-import type { LipSyncFrame } from '../audio/LipSyncProvider';
-import type { MusicPlayer } from '../audio/MusicPlayer';
+import { StageScene, type StageLayout } from '../animation/StageScene';
 import { SocketIoTrackingTransport } from '../networking/SocketIoTrackingTransport';
 import { useSessionStore } from '../stores/session';
 import { useSettingsStore } from '../stores/settings';
 import { FpsCounter } from '../tracking/FpsCounter';
 import { SkeletonOverlay } from '../tracking/SkeletonOverlay';
 
-export function useLiveStage(layout: 'stage' | 'music' = 'stage') {
+const FRAME_STALE_MS = 450;
+
+export function useLiveStage(layout: StageLayout = 'stage') {
   const route = useRoute();
   const sessionStore = useSessionStore();
   const settings = useSettingsStore();
@@ -29,18 +27,15 @@ export function useLiveStage(layout: 'stage' | 'music' = 'stage') {
   const glassesConfidence = ref(0);
   const incomingMode = ref<TrackingMode>('body');
   const avatarStatus = ref('VRM wordt geladen…');
-  const lipSyncMouth = ref(0);
-  const lipSyncViseme = ref('sil');
+  const frameAgeMs = ref<number | null>(null);
 
   const transport = new SocketIoTrackingTransport();
   const trackingMeter = new FpsCounter();
   const renderMeter = new FpsCounter();
-  const faceLipSync = new FaceTrackingLipSyncProvider();
   const loopPlayer = new LoopAnimationPlayer();
-  let audioLipSync: AudioVisemeLipSyncProvider | null = null;
   let scene: StageScene | null = null;
   let overlay: SkeletonOverlay | null = null;
-  let latestFrame: TrackingFrame | null = null;
+  const latestByPerson = new Map<number, { frame: TrackingFrame; at: number }>();
   let rafId = 0;
   let lastPing = 0;
 
@@ -49,10 +44,13 @@ export function useLiveStage(layout: 'stage' | 'music' = 'stage') {
     if (sceneRef.value) {
       scene = new StageScene(sceneRef.value);
       scene.setLayout(layout);
+      scene.setCast(layout === 'dance' ? settings.danceCast : 'solo');
       scene.setShowSkeleton(settings.showHumanoid);
       scene.setShowAvatar(settings.showVrm);
-      scene.smoothing.setNewWeight(settings.smoothing);
+      scene.setSmoothing(settings.smoothing);
       scene.setFigure(settings.halloweenFigure);
+      scene.setFigureB(settings.halloweenFigureB);
+      scene.setExaggerationPreset(settings.exaggerationPreset);
     }
     overlay = overlayRef.value ? new SkeletonOverlay(overlayRef.value) : null;
     bindTransport();
@@ -83,13 +81,36 @@ export function useLiveStage(layout: 'stage' | 'music' = 'stage') {
   );
   watch(
     () => settings.smoothing,
-    (value) => scene?.smoothing.setNewWeight(value),
+    (value) => scene?.setSmoothing(value),
   );
   watch(
     () => settings.halloweenFigure,
     (figure) => {
       scene?.setFigure(figure);
       transport.sendSettings({ halloweenFigure: figure });
+    },
+  );
+  watch(
+    () => settings.halloweenFigureB,
+    (figure) => {
+      scene?.setFigureB(figure);
+      transport.sendSettings({ halloweenFigureB: figure });
+    },
+  );
+  watch(
+    () => settings.danceCast,
+    (cast) => {
+      if (layout === 'dance') {
+        scene?.setCast(cast);
+      }
+      transport.sendSettings({ danceCast: cast });
+    },
+  );
+  watch(
+    () => settings.exaggerationPreset,
+    (preset) => {
+      scene?.setExaggerationPreset(preset);
+      transport.sendSettings({ exaggerationPreset: preset });
     },
   );
   watch(incomingMode, (mode) => {
@@ -111,14 +132,10 @@ export function useLiveStage(layout: 'stage' | 'music' = 'stage') {
       applySessionSettings(sessionSettings);
     });
     transport.onFrame((frame) => {
-      latestFrame = frame;
+      latestByPerson.set(frame.personId || 1, { frame, at: performance.now() });
       incomingMode.value = frame.mode ?? (frame.face && !frame.pose ? 'face' : 'body');
       trackingFps.value = trackingMeter.tick();
-      personCount.value = frame.pose || frame.face ? 1 : 0;
-      poseConfidence.value = frame.pose?.confidence ?? 0;
-      faceConfidence.value = frame.face?.confidence ?? 0;
-      glassesPresent.value = frame.glasses?.present ?? false;
-      glassesConfidence.value = frame.glasses?.confidence ?? 0;
+      refreshPresence();
     });
   }
 
@@ -127,7 +144,14 @@ export function useLiveStage(layout: 'stage' | 'music' = 'stage') {
       sessionStore.clientId = await transport.connect({
         sessionId: sessionStore.sessionId,
         role: 'stage',
-        name: layout === 'music' ? 'Music' : 'Stage',
+        name:
+        layout === 'music'
+          ? 'Music'
+          : layout === 'dance'
+            ? 'Dance'
+            : layout === 'halloween'
+              ? 'Halloween'
+              : 'Stage',
       });
     } catch (error) {
       avatarStatus.value = error instanceof Error ? error.message : 'Verbinding mislukt';
@@ -138,7 +162,7 @@ export function useLiveStage(layout: 'stage' | 'music' = 'stage') {
     try {
       await scene?.loadVrm();
       scene?.setShowAvatar(settings.showVrm);
-      avatarStatus.value = 'VRM avatar geladen';
+      avatarStatus.value = scene && scene.actorCount() > 1 ? 'VRM avatars geladen' : 'VRM avatar geladen';
     } catch (error) {
       avatarStatus.value =
         error instanceof Error
@@ -150,23 +174,36 @@ export function useLiveStage(layout: 'stage' | 'music' = 'stage') {
   function loop(now: number): void {
     rafId = requestAnimationFrame(loop);
     renderFps.value = renderMeter.tick(now);
-    faceLipSync.setFrame(latestFrame);
-    const chosen = chooseLipSync(faceLipSync.update(now), audioLipSync?.update(now) ?? null);
-    lipSyncMouth.value = chosen?.mouthOpen ?? 0;
-    lipSyncViseme.value = chosen?.viseme ?? 'sil';
-    scene?.setAudioLipSync(layout === 'music' || Boolean(chosen && chosen.mouthOpen > 0.01 && settings.lipSyncSource !== 'face'));
+    pruneStale(now);
+    const newest = [...latestByPerson.values()].reduce((latest, item) => Math.max(latest, item.at), 0);
+    frameAgeMs.value = newest ? now - newest : null;
+    const frames = [...latestByPerson.values()].map((item) => item.frame);
+    const primary = latestByPerson.get(1)?.frame ?? frames[0] ?? null;
     const loopId = settings.loopAnimation;
     if (loopId && scene) {
       const sample = loopPlayer.sample(loopId, now);
       incomingMode.value = sample.mode;
       scene.setTrackingMode(sample.mode);
-      scene.controller.applyLoop(loopId, sample, settings.lipSyncSource === 'face' ? null : chosen);
-    } else {
-      scene?.controller.apply(latestFrame, settings.lipSyncSource === 'face' ? null : chosen);
+      const count = scene.actorCount();
+      for (let index = 0; index < count; index += 1) {
+        scene.actor(index)?.controller.applyLoop(loopId, sample);
+      }
+    } else if (scene) {
+      const count = scene.actorCount();
+      for (let index = 0; index < count; index += 1) {
+        const personId = index + 1;
+        const frame = latestByPerson.get(personId)?.frame ?? (count === 1 ? primary : null);
+        const actor = scene.actor(index);
+        if (!frame) {
+          actor?.controller.reset();
+          continue;
+        }
+        actor?.controller.apply(frame);
+      }
     }
     scene?.render(now);
     if (settings.showDebugSkeleton) {
-      overlay?.draw(latestFrame, layout === 'music' ? 9 : 16, layout === 'music' ? 16 : 9, true);
+      overlay?.draw(frames, layout === 'stage' ? 16 : 9, layout === 'stage' ? 9 : 16, true);
     } else {
       overlay?.clear();
     }
@@ -176,12 +213,39 @@ export function useLiveStage(layout: 'stage' | 'music' = 'stage') {
     }
   }
 
+  function pruneStale(now: number): void {
+    for (const [id, item] of latestByPerson) {
+      if (now - item.at > FRAME_STALE_MS) {
+        latestByPerson.delete(id);
+      }
+    }
+    refreshPresence();
+  }
+
+  function refreshPresence(): void {
+    const frames = [...latestByPerson.values()].map((item) => item.frame);
+    personCount.value = frames.length;
+    poseConfidence.value = average(frames.map((frame) => frame.pose?.confidence ?? 0));
+    faceConfidence.value = average(frames.map((frame) => frame.face?.confidence ?? 0));
+    glassesPresent.value = frames.some((frame) => frame.glasses?.present);
+    glassesConfidence.value = average(frames.map((frame) => frame.glasses?.confidence ?? 0));
+  }
+
   function applySessionSettings(sessionSettings: SessionSettings): void {
     if (sessionSettings.halloweenFigure) {
       settings.halloweenFigure = sessionSettings.halloweenFigure;
     }
+    if (sessionSettings.halloweenFigureB) {
+      settings.halloweenFigureB = sessionSettings.halloweenFigureB;
+    }
     if (sessionSettings.loopAnimation !== undefined) {
       settings.loopAnimation = sessionSettings.loopAnimation;
+    }
+    if (sessionSettings.danceCast) {
+      settings.danceCast = sessionSettings.danceCast;
+    }
+    if (sessionSettings.exaggerationPreset) {
+      settings.exaggerationPreset = sessionSettings.exaggerationPreset;
     }
   }
 
@@ -196,35 +260,6 @@ export function useLiveStage(layout: 'stage' | 'music' = 'stage') {
     return scene?.canvas ?? sceneRef.value;
   }
 
-  function attachMusicPlayer(player: MusicPlayer): void {
-    audioLipSync = new AudioVisemeLipSyncProvider(
-      () => player.getAnalyser(),
-      () => !player.paused,
-    );
-  }
-
-  function chooseLipSync(face: LipSyncFrame, audio: LipSyncFrame | null): LipSyncFrame | null {
-    const source = settings.lipSyncSource;
-    if (source === 'face' || !audio) {
-      return face;
-    }
-    if (source === 'audio') {
-      return audio;
-    }
-    return {
-      timestamp: audio.timestamp,
-      mouthOpen: Math.max(face.mouthOpen * 0.35, audio.mouthOpen),
-      viseme: audio.viseme ?? face.viseme,
-      visemes: {
-        aa: Math.max(face.visemes?.aa ?? 0, audio.visemes?.aa ?? 0),
-        ee: audio.visemes?.ee ?? 0,
-        ih: audio.visemes?.ih ?? 0,
-        oh: audio.visemes?.oh ?? 0,
-        ou: audio.visemes?.ou ?? 0,
-      },
-    };
-  }
-
   return {
     sceneRef,
     overlayRef,
@@ -237,10 +272,15 @@ export function useLiveStage(layout: 'stage' | 'music' = 'stage') {
     glassesConfidence,
     incomingMode,
     avatarStatus,
-    lipSyncMouth,
-    lipSyncViseme,
-    attachMusicPlayer,
+    frameAgeMs,
     getCanvas,
     resize: onResize,
   };
+}
+
+function average(values: number[]): number {
+  if (values.length === 0) {
+    return 0;
+  }
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
 }

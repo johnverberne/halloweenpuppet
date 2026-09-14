@@ -36,14 +36,6 @@
         <input v-model="recordOnStart" type="checkbox" />
         Opnemen na countdown
       </label>
-      <label class="field">
-        Lipsync
-        <select v-model="settings.lipSyncSource">
-          <option value="audio">Muziek (audio-visemes)</option>
-          <option value="face">Gezicht</option>
-          <option value="mix">Mix</option>
-        </select>
-      </label>
       <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
     </div>
   </section>
@@ -52,14 +44,12 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { DEFAULT_TRACK_TITLE, DEFAULT_TRACK_URL, type MusicPlayer } from '../audio/MusicPlayer';
-import { useSettingsStore } from '../stores/settings';
 
 const props = defineProps<{
   player: MusicPlayer;
   counting?: boolean;
 }>();
 const recordOnStart = defineModel<boolean>('recordOnStart', { default: true });
-const settings = useSettingsStore();
 const emit = defineEmits<{ countdown: [] }>();
 
 const title = ref(DEFAULT_TRACK_TITLE);

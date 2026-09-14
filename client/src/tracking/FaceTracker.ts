@@ -15,15 +15,19 @@ export interface FaceDetectResult {
 export class FaceTracker {
   private landmarker: FaceLandmarker | null = null;
   private readonly glasses = new GlassesDetector();
+  private numFaces = 1;
 
-  async init(): Promise<void> {
-    if (this.landmarker) {
+  async init(numFaces = 1): Promise<void> {
+    const next = numFaces > 1 ? 2 : 1;
+    if (this.landmarker && this.numFaces === next) {
       return;
     }
+    this.close();
+    this.numFaces = next;
     const fileset = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM_URL);
     const options = {
       runningMode: 'VIDEO' as const,
-      numFaces: 1,
+      numFaces: this.numFaces,
       outputFaceBlendshapes: true,
       outputFacialTransformationMatrixes: true,
       minFaceDetectionConfidence: 0.4,
@@ -44,30 +48,37 @@ export class FaceTracker {
   }
 
   detect(video: HTMLVideoElement, timestampMs: number): FaceDetectResult | null {
+    return this.detectAll(video, timestampMs)[0] ?? null;
+  }
+
+  detectAll(video: HTMLVideoElement, timestampMs: number): FaceDetectResult[] {
     if (!this.landmarker || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
-      return null;
+      return [];
     }
     const result: FaceLandmarkerResult = this.landmarker.detectForVideo(video, timestampMs);
-    const landmarks = result.faceLandmarks[0];
-    if (!landmarks || landmarks.length === 0) {
-      return null;
-    }
-    const blendShapes =
-      result.faceBlendshapes[0]?.categories.map((category) => ({
-        categoryName: category.categoryName,
-        score: category.score,
-      })) ?? [];
-    const matrix = result.facialTransformationMatrixes[0]?.data;
-    const face: FacePayload = {
-      landmarks: toLandmarks(landmarks),
-      confidence: averageVisibility(landmarks),
-      transformationMatrix: matrix ? [...matrix] : undefined,
-    };
-    return {
-      face,
-      blendShapes,
-      glasses: this.glasses.detect(video, face.landmarks),
-    };
+    return result.faceLandmarks
+      .map((landmarks, index) => {
+        if (!landmarks || landmarks.length === 0) {
+          return null;
+        }
+        const blendShapes =
+          result.faceBlendshapes[index]?.categories.map((category) => ({
+            categoryName: category.categoryName,
+            score: category.score,
+          })) ?? [];
+        const matrix = result.facialTransformationMatrixes[index]?.data;
+        const face: FacePayload = {
+          landmarks: toLandmarks(landmarks),
+          confidence: averageVisibility(landmarks),
+          transformationMatrix: matrix ? [...matrix] : undefined,
+        };
+        return {
+          face,
+          blendShapes,
+          glasses: this.glasses.detect(video, face.landmarks),
+        } satisfies FaceDetectResult;
+      })
+      .filter((item): item is FaceDetectResult => item !== null);
   }
 
   close(): void {

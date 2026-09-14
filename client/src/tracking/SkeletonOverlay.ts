@@ -11,7 +11,12 @@ interface DrawBox {
 export class SkeletonOverlay {
   constructor(private readonly canvas: HTMLCanvasElement) {}
 
-  draw(frame: TrackingFrame | null, sourceWidth: number, sourceHeight: number, flipX = false): void {
+  draw(
+    frame: TrackingFrame | TrackingFrame[] | null,
+    sourceWidth: number,
+    sourceHeight: number,
+    flipX = false,
+  ): void {
     const ctx = this.canvas.getContext('2d');
     if (!ctx) {
       return;
@@ -23,7 +28,8 @@ export class SkeletonOverlay {
       this.canvas.height = height;
     }
     ctx.clearRect(0, 0, width, height);
-    if (!frame || sourceWidth === 0 || sourceHeight === 0) {
+    const frames = Array.isArray(frame) ? frame : frame ? [frame] : [];
+    if (frames.length === 0 || sourceWidth === 0 || sourceHeight === 0) {
       return;
     }
 
@@ -33,13 +39,15 @@ export class SkeletonOverlay {
       ctx.translate(width, 0);
       ctx.scale(-1, 1);
     }
-    if (frame.mode === 'face' || frame.face) {
-      this.drawFace(ctx, frame.face?.landmarks ?? [], box);
-      if (frame.glasses?.present) {
-        this.drawGlasses(ctx, frame.face?.landmarks ?? [], box);
+    for (const item of frames) {
+      if (item.mode === 'face' || item.face) {
+        this.drawFace(ctx, item.face?.landmarks ?? [], box);
+        if (item.glasses?.present) {
+          this.drawGlasses(ctx, item.face?.landmarks ?? [], box);
+        }
+      } else {
+        this.drawPose(ctx, item.pose?.landmarks ?? [], box);
       }
-    } else {
-      this.drawPose(ctx, frame.pose?.landmarks ?? [], box);
     }
     if (flipX) {
       ctx.restore();

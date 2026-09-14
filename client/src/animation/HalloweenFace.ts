@@ -42,8 +42,8 @@ interface FigureRig {
   glasses: Group;
 }
 
-const MOUTH_GAIN = 1.55;
-const EYE_GAIN = 1.25;
+const MOUTH_GAIN = 1;
+const EYE_GAIN = 1;
 
 export class HalloweenFace {
   readonly root = new Group();

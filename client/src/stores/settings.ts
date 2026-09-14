@@ -1,6 +1,12 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import type { HalloweenFigureId, LoopAnimationId, TrackingMode } from '@halloweenpuppet/shared';
+import type {
+  DanceCast,
+  ExaggerationPresetId,
+  HalloweenFigureId,
+  LoopAnimationId,
+  TrackingMode,
+} from '@halloweenpuppet/shared';
 import type { CameraFacing } from '../tracking/camera';
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -10,12 +16,14 @@ export const useSettingsStore = defineStore('settings', () => {
   const height = ref(720);
   const trackingMode = ref<TrackingMode>('body');
   const halloweenFigure = ref<HalloweenFigureId>('pumpkin');
+  const halloweenFigureB = ref<HalloweenFigureId>('skeleton');
+  const danceCast = ref<DanceCast>('solo');
   const loopAnimation = ref<LoopAnimationId | null>(null);
+  const exaggerationPreset = ref<ExaggerationPresetId>('halloween');
   const smoothing = ref(0.35);
   const showDebugSkeleton = ref(true);
   const showHumanoid = ref(true);
   const showVrm = ref(true);
-  const lipSyncSource = ref<'audio' | 'face' | 'mix'>('audio');
 
   return {
     facing,
@@ -24,11 +32,13 @@ export const useSettingsStore = defineStore('settings', () => {
     height,
     trackingMode,
     halloweenFigure,
+    halloweenFigureB,
+    danceCast,
     loopAnimation,
+    exaggerationPreset,
     smoothing,
     showDebugSkeleton,
     showHumanoid,
     showVrm,
-    lipSyncSource,
   };
 });

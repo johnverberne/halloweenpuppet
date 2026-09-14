@@ -25,18 +25,22 @@ body,
   min-height: 100%;
   background: var(--bg);
   color: var(--text);
+  -webkit-text-size-adjust: 100%;
 }
 
 button,
 select,
 input {
   font: inherit;
+  font-size: 1rem;
+  touch-action: manipulation;
 }
 
 button {
   border: 0;
   border-radius: 10px;
   padding: 0.65rem 0.9rem;
+  min-height: 2.6rem;
   background: var(--accent);
   color: #102016;
   font-weight: 700;
@@ -104,6 +108,7 @@ label.field select {
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 0.55rem 0.7rem;
+  min-height: 2.6rem;
 }
 
 .debug-overlay {

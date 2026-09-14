@@ -2,11 +2,12 @@
   <main class="home">
     <div class="stack">
       <section class="panel hero">
-        <p class="kicker">Phases 1–3 · 6</p>
+        <p class="kicker">Phases 7–8</p>
         <h1>Halloween Puppet</h1>
         <p class="muted">
           Realtime motion capture in de browser. De sensor detecteert je lichaam lokaal met MediaPipe
-          en stuurt alleen landmarks naar de stage.
+          en stuurt alleen landmarks naar de stage. UI, API en Socket.IO draaien op deze server.
+          Scan de QR om je telefoon te koppelen.
         </p>
         <div class="row">
           <label class="field">
@@ -19,6 +20,8 @@
           <RouterLink class="cta" :to="`/sensor/${sessionId}`">Open sensor</RouterLink>
           <RouterLink class="cta secondary" :to="`/stage/${sessionId}`">Open stage</RouterLink>
           <RouterLink class="cta secondary" :to="`/music/${sessionId}`">Open muziek</RouterLink>
+          <RouterLink class="cta secondary" :to="`/dance/${sessionId}`">Open dance</RouterLink>
+          <RouterLink class="cta secondary" :to="`/halloween/${sessionId}`">Open halloween</RouterLink>
         </div>
         <PhoneConnect :path="`/sensor/${sessionId}`" />
       </section>
@@ -53,7 +56,7 @@ function createSession(): void {
   min-height: 100vh;
   display: grid;
   place-items: center;
-  padding: 1.5rem;
+  padding: calc(1.5rem + env(safe-area-inset-top)) 1.5rem calc(1.5rem + env(safe-area-inset-bottom));
   background:
     radial-gradient(circle at 20% 10%, #2d2238, transparent 35%),
     radial-gradient(circle at 80% 90%, #173423, transparent 30%),

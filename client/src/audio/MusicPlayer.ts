@@ -9,7 +9,6 @@ export class MusicPlayer {
   private source: MediaElementAudioSourceNode | null = null;
   private gain: GainNode | null = null;
   private destination: MediaStreamAudioDestinationNode | null = null;
-  private analyser: AnalyserNode | null = null;
   private objectUrl: string | null = null;
   title = DEFAULT_TRACK_TITLE;
   status: MusicStatus = 'idle';
@@ -131,10 +130,6 @@ export class MusicPlayer {
     return this.destination?.stream ?? new MediaStream();
   }
 
-  getAnalyser(): AnalyserNode | null {
-    return this.analyser;
-  }
-
   dispose(): void {
     this.pause();
     this.revokeObjectUrl();
@@ -144,7 +139,6 @@ export class MusicPlayer {
     this.source = null;
     this.gain = null;
     this.destination = null;
-    this.analyser = null;
   }
 
   private ensureGraph(): void {
@@ -156,12 +150,8 @@ export class MusicPlayer {
     this.source = context.createMediaElementSource(this.audio);
     this.gain = context.createGain();
     this.destination = context.createMediaStreamDestination();
-    this.analyser = context.createAnalyser();
-    this.analyser.fftSize = 2048;
-    this.analyser.smoothingTimeConstant = 0.55;
     this.gain.gain.value = this.audio.volume;
-    this.source.connect(this.analyser);
-    this.analyser.connect(this.gain);
+    this.source.connect(this.gain);
     this.gain.connect(context.destination);
     this.gain.connect(this.destination);
   }

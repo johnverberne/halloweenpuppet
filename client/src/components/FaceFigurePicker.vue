@@ -1,7 +1,7 @@
 <template>
   <section class="panel">
-    <p class="kicker">Halloween figuur</p>
-    <p class="muted hint">Wordt gebruikt in gezichtsmodus</p>
+    <p class="kicker">{{ props.title }}</p>
+    <p class="muted hint">Zichtbaar in gezicht- en halloweenmodus</p>
     <div class="figures">
       <button
         v-for="figure in figures"
@@ -22,6 +22,12 @@
 import { HALLOWEEN_FIGURES, type HalloweenFigureId } from '@halloweenpuppet/shared';
 
 const model = defineModel<HalloweenFigureId>({ required: true });
+const props = withDefaults(
+  defineProps<{
+    title?: string;
+  }>(),
+  { title: 'Halloween figuur' },
+);
 const figures = HALLOWEEN_FIGURES;
 
 function select(id: HalloweenFigureId): void {

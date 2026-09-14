@@ -73,7 +73,7 @@
           </svg>
         </div>
         <h3>Pop op het scherm</h3>
-        <p>Stage toont 3D-humanoid, VRM of Halloween-gezicht. Muziek neemt 9:16 op.</p>
+        <p>Stage, halloween, muziek of dance (1 of 2 poppen) volgt de landmarks.</p>
       </li>
     </ol>
 
@@ -88,7 +88,19 @@
       </li>
       <li>
         <strong>Muziek</strong>
-        countdown, lipsync en WebM-opname
+        countdown en WebM-opname
+      </li>
+      <li>
+        <strong>Dance</strong>
+        solo of duo, stabiele personId, 9:16
+      </li>
+      <li>
+        <strong>Halloween</strong>
+        maan, mist, pompoenen en overdreven mimiek
+      </li>
+      <li>
+        <strong>QR</strong>
+        telefoon koppelt met dezelfde sessie
       </li>
     </ul>
   </section>

@@ -2,14 +2,15 @@
   "name": "halloweenpuppet",
   "private": true,
   "version": "0.1.0",
-  "description": "Browser Halloween motion-capture puppet: MediaPipe, VRM, visemes, WebM recording",
+  "description": "Browser Halloween motion-capture puppet: MediaPipe, VRM, music playback, WebM recording",
   "workspaces": [
     "shared",
     "server",
     "client"
   ],
   "scripts": {
-    "dev": "concurrently -n server,client -c cyan,magenta \"npm run dev -w server\" \"npm run dev -w client\"",
+    "dev": "npm run dev -w server",
+    "dev:split": "concurrently -n server,client -c cyan,magenta \"npm run dev -w server -- --api-only\" \"npm run dev -w client\"",
     "build": "npm run build -w client && npm run build -w server",
     "start": "npm run start -w server",
     "typecheck": "npm run typecheck -w shared && npm run typecheck -w server && npm run typecheck -w client"
