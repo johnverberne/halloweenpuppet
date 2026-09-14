@@ -52,7 +52,7 @@ export class HalloweenFace {
 
   constructor() {
     this.root.name = 'halloween-face';
-    this.root.position.set(0, 1.22, 0);
+    this.root.position.set(0, 1.38, 0);
     this.figures.set('pumpkin', createPumpkin());
     this.figures.set('skeleton', createSkeleton());
     this.figures.set('zombie', createZombie());

@@ -172,16 +172,16 @@ export class StageScene {
     const dance = this.layout === 'dance';
     const close = this.halloweenOn();
     if (dance && !close) {
-      this.camera.position.set(0, 1.32, 4.1);
-      this.camera.lookAt(0, 1.05, 0);
+      this.camera.position.set(0, 1.45, 4.1);
+      this.camera.lookAt(0, 1.35, 0);
     } else if (close) {
       const distance =
         this.layout === 'halloween' ? 2.05 : dance ? 2.35 : this.layout === 'music' ? 1.55 : 1.7;
-      this.camera.position.set(0, 1.24, distance);
-      this.camera.lookAt(0, 1.2, 0);
+      this.camera.position.set(0, 1.42, distance);
+      this.camera.lookAt(0, 1.38, 0);
     } else {
-      this.camera.position.set(0, 1.35, 3.4);
-      this.camera.lookAt(0, 1.05, 0);
+      this.camera.position.set(0, 1.55, 3.2);
+      this.camera.lookAt(0, 1.42, 0);
     }
     this.renderer.render(this.scene, this.camera);
   }

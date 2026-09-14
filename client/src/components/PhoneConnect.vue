@@ -54,15 +54,9 @@ async function load(): Promise<void> {
     if (!response.ok) {
       throw new Error('info failed');
     }
-    const data = (await response.json()) as {
-      lanAddresses?: string[];
-      port?: number;
-      protocol?: string;
-    };
-    const port = String(
-      data.port ?? (window.location.port || (window.location.protocol === 'https:' ? '443' : '80')),
-    );
-    const protocol = data.protocol ? `${data.protocol}:` : window.location.protocol;
+    const data = (await response.json()) as { lanAddresses?: string[] };
+    const port = window.location.port || (window.location.protocol === 'https:' ? '443' : '80');
+    const protocol = window.location.protocol;
     const path = props.path.startsWith('/') ? props.path : `/${props.path}`;
     urls.value = (data.lanAddresses ?? []).map((ip) => `${protocol}//${ip}:${port}${path}`);
     primary.value = urls.value[0] ?? '';

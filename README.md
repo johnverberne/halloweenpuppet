@@ -49,9 +49,9 @@ One process serves the Vue app, `/api` and Socket.IO over HTTPS.
 | Mode | Command | URL |
 | --- | --- | --- |
 | Dev (one server) | `npm run dev` | `https://localhost:3000` |
-| Production | `npm run build && npm start` | `https://localhost:3000` |
+| Production | `npm start` | HTTP on `PORT` (builds `client/dist` if missing) |
 
-`HP_HTTPS=0` serves HTTP. `PORT=8443` changes the port.
+Local HTTPS is for the camera. On a host (`NODE_ENV=production` / `npm start`) the process listens HTTP; TLS sits on the proxy. Set `HP_HTTPS=1` only if Node itself should terminate TLS.
 
 ## Music and recording
 
@@ -97,8 +97,8 @@ halloweenpuppet/
 | --- | --- |
 | `npm install` | Install all workspaces |
 | `npm run dev` | One HTTPS server: Vue (Vite) + API + Socket.IO |
-| `npm run build` | Typecheck + production client |
-| `npm start` | Same server, Vue from `client/dist` |
+| `npm run build` | Production client + server typecheck |
+| `npm start` | Build Vue if needed, then serve `client/dist` + API |
 | `npm run typecheck` | TypeScript for shared, server, and client |
 
 ## Privacy

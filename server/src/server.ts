@@ -16,13 +16,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PORT = Number(process.env.PORT ?? 3000);
-const CLIENT_ROOT = path.resolve(__dirname, '../../client');
-const CLIENT_DIST = path.resolve(CLIENT_ROOT, 'dist');
-const CLIENT_CONFIG = path.resolve(CLIENT_ROOT, 'vite.config.ts');
-const USE_HTTPS = process.env.HP_HTTPS !== '0';
+const CLIENT_ROOT = resolveClientRoot();
+const CLIENT_DIST = path.join(CLIENT_ROOT, 'dist');
+const CLIENT_CONFIG = path.join(CLIENT_ROOT, 'vite.config.ts');
 const API_ONLY = process.argv.includes('--api-only');
 const USE_STATIC = process.argv.includes('--static') || process.env.NODE_ENV === 'production';
 const USE_VITE = !API_ONLY && !USE_STATIC;
+// Local Vite/dev needs HTTPS for the camera. PaaS sits behind a TLS proxy.
+const USE_HTTPS = process.env.HP_HTTPS === '1' || (process.env.HP_HTTPS !== '0' && USE_VITE);
 
 async function start(): Promise<void> {
   const app = express();
@@ -136,3 +137,13 @@ void start().catch((error: unknown) => {
   console.error(error);
   process.exit(1);
 });
+
+function resolveClientRoot(): string {
+  const candidates = [
+    path.resolve(__dirname, '../../client'),
+    path.resolve(process.cwd(), '../client'),
+    path.resolve(process.cwd(), 'client'),
+  ];
+  const found = candidates.find((folder) => fs.existsSync(path.join(folder, 'package.json')));
+  return found ?? candidates[0];
+}

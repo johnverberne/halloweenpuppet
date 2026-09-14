@@ -46,6 +46,13 @@ function visible(landmarks: Landmark[], index: number, min = 0.25): boolean {
   return (landmark.visibility ?? 1) >= min;
 }
 
+function keepUpright(direction: Vector3, minY = 0.6): Vector3 {
+  if (direction.y >= minY) {
+    return direction;
+  }
+  return direction.setY(minY).normalize();
+}
+
 function lookRotation(xAxis: Vector3, yAxis: Vector3): Quaternion {
   const x = xAxis.clone().normalize();
   const y = yAxis.clone().normalize();
@@ -102,11 +109,21 @@ export class SkeletonMapper {
     mid(this.leftHip, this.rightHip, this.hipMid);
     mid(this.leftShoulder, this.rightShoulder, this.shoulderMid);
 
-    const spineDir = dir(this.hipMid, this.shoulderMid);
+    const hipsSeen =
+      !image ||
+      (visible(image, PoseLandmark.leftHip, 0.45) && visible(image, PoseLandmark.rightHip, 0.45));
+    // Webcam / sitting: hips are guessed in front of the torso, which folds the VRM
+    // forward and drops the head to chest height. Keep the spine mostly upright.
+    const spineDir = hipsSeen
+      ? keepUpright(dir(this.hipMid, this.shoulderMid), 0.62)
+      : REST.up.clone();
+    const hipAcross = hipsSeen
+      ? dir(this.rightHip, this.leftHip)
+      : dir(this.rightShoulder, this.leftShoulder);
     // Face the camera (+Z). Using left→right here yaws the hips 180° and swaps the legs.
-    const hipsWorld = lookRotation(dir(this.rightHip, this.leftHip), spineDir);
+    const hipsWorld = lookRotation(hipAcross, spineDir);
     const spineWorld = fromTo(REST.up, spineDir);
-    const neckWorld = fromTo(REST.up, dir(this.shoulderMid, this.nose));
+    const neckWorld = fromTo(REST.up, keepUpright(dir(this.shoulderMid, this.nose), 0.4));
 
     const rotations: MappedPose['rotations'] = {
       hips: hipsWorld,

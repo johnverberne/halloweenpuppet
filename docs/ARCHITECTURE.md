@@ -18,7 +18,7 @@ Halloween Puppet is an npm workspaces monorepo. Live motion never leaves the loc
 | `@halloweenpuppet/server` | `server/` | HTTPS host: session registry, Socket.IO, Vue app |
 | `@halloweenpuppet/client` | `client/` | Vue 3 UI, MediaPipe, Three.js / VRM, music and recording |
 
-`npm run dev` starts **one** process on `https://localhost:3000`. Express handles `/api` and Socket.IO; Vite runs as middleware for the Vue app (HMR included). `npm start` after a build serves `client/dist` from that same process. The browser never needs a second origin: `io()` and `fetch('/api/…')` use the page host.
+`npm run dev` starts **one** process on `https://localhost:3000`. Express handles `/api` and Socket.IO; Vite runs as middleware for the Vue app (HMR included). `npm start` builds `client/dist` if needed and serves it over HTTP (TLS at the proxy). The browser never needs a second origin: `io()` and `fetch('/api/…')` use the page host.
 
 `npm run dev:split` is the old two-process setup (API-only server + Vite on 5173).
 

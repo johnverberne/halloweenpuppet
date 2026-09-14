@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch --exclude \"../client/**\" --exclude \"**/node_modules/**\" src/server.ts",
     "build": "tsc --noEmit -p tsconfig.json",
-    "start": "tsx src/server.ts --static",
+    "start": "node ../scripts/ensure-client.mjs && tsx src/server.ts --static",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -14,14 +14,14 @@
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "selfsigned": "^2.4.1",
-    "socket.io": "^4.8.1"
+    "socket.io": "^4.8.1",
+    "tsx": "^4.19.3"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.1",
     "@types/node": "^22.13.10",
     "vite": "^6.2.3",
-    "tsx": "^4.19.3",
     "typescript": "^5.8.2"
   }
 }

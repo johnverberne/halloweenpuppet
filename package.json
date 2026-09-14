@@ -12,6 +12,7 @@
     "dev": "npm run dev -w server",
     "dev:split": "concurrently -n server,client -c cyan,magenta \"npm run dev -w server -- --api-only\" \"npm run dev -w client\"",
     "build": "npm run build -w client && npm run build -w server",
+    "heroku-postbuild": "npm run build -w client",
     "start": "npm run start -w server",
     "typecheck": "npm run typecheck -w shared && npm run typecheck -w server && npm run typecheck -w client"
   },
