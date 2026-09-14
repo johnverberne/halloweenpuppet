@@ -1,0 +1,16 @@
+node_modules
+dist
+.DS_Store
+*.log
+.env
+.env.local
+.vite
+*.tsbuildinfo
+
+# Local media (not redistributed)
+*.mp3
+*.wav
+*.ogg
+*.webm
+client/public/avatars/*.vrm
+!client/public/avatars/.gitkeep
